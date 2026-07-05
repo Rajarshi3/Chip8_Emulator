@@ -1,0 +1,13 @@
+#Ignore Code::Blocks build folders
+bin/
+obj/
+
+#Ignore compiled files
+*.exe
+*.o
+*.out
+
+#Ignore Code::Blocks workspace/layout files (optional, but recommended)
+*.layout
+*.depend
+
