@@ -15,16 +15,16 @@ typedef struct{
 
 //the chip8 structure
 typedef struct{
-    uint8_t memory[4096];
-    uint8_t reg[16];
-    uint16_t index;
-    uint16_t pc;
-    uint8_t sp;
-    uint16_t stack[16];
-    uint8_t dtimer;
-    uint8_t stimer;
-    uint32_t display[64*32];
-    uint8_t keypad[16];
+    uint8_t memory[4096]; //4KB memory=4096 x 1Byte=4096 x 8bits
+    uint8_t reg[16]; //16 x 8bit registers
+    uint16_t index; //16 bit index register to store memory addresses
+    uint16_t pc; //16 bit program counter to track current instruction
+    uint8_t sp; //8 bit stack pointer to point to top of stack memory
+    uint16_t stack[16]; //stack memory(an array of 16 16bit values used to store return adresses when calling subroutines)
+    uint8_t dtimer; //8bit delay timer register
+    uint8_t stimer; //8bit sound timer register
+    uint32_t display[64*32]; //storing the state of the default 64x32 display
+    uint8_t keypad[16]; //storing the state of keypad
 } Chip8;
 
 //returns false if SDL is initialised properly
@@ -106,7 +106,8 @@ void run(Chip8* chip8){
 }
 
 //keyboard/input handling function
-handle_event(Chip8* chip8, SDL_Event* event){
+void handle_event(Chip8* chip8, SDL_Event* event){
+
     /*
     SDL_Event is a enum that has a member called type
     if(event->type==SDL_KEYDOWN) it means a keyboard key has been pressed.
@@ -115,15 +116,52 @@ handle_event(Chip8* chip8, SDL_Event* event){
     keysym is an instance of SDL_Keysym struct which has a member called sym that denotes virtual keycode of the key pressed.
     sym is an instance of SDL_KeyCode enum.
     Refer to https://wiki.libsdl.org/SDL2/SDL_KeyCode to find the keycodes of keyboard keys.
-
     */
-    key_state=(event->type==SDL_KEYDOWN)? 1:0;
 
+    uint8_t key_state=(event->type==SDL_KEYDOWN)? 1:0;
+
+    /*The keyboard is supposed to look like this
+    123C 1234
+    456D qwer
+    789E asdf
+    A0BF zxcv
+    */
     switch(event->key.keysym.sym){
-        case:
+        case(SDLK_1): chip8->keypad[0]=key_state; break;
+        case(SDLK_2): chip8->keypad[1]=key_state; break;
+        case(SDLK_3): chip8->keypad[2]=key_state; break;
+        case(SDLK_4): chip8->keypad[3]=key_state; break;
+
+        case(SDLK_q): chip8->keypad[4]=key_state; break;
+        case(SDLK_w): chip8->keypad[5]=key_state; break;
+        case(SDLK_e): chip8->keypad[6]=key_state; break;
+        case(SDLK_r): chip8->keypad[7]=key_state; break;
+
+        case(SDLK_a): chip8->keypad[8]=key_state; break;
+        case(SDLK_s): chip8->keypad[9]=key_state; break;
+        case(SDLK_d): chip8->keypad[10]=key_state; break;
+        case(SDLK_f): chip8->keypad[11]=key_state; break;
+
+        case(SDLK_z): chip8->keypad[12]=key_state; break;
+        case(SDLK_x): chip8->keypad[13]=key_state; break;
+        case(SDLK_c): chip8->keypad[14]=key_state; break;
+        case(SDLK_v): chip8->keypad[15]=key_state; break;
+
+
     }
 
 }
+
+/*void emulate_cycle(Chip8* chip8){
+    uint16_t instruction= ((chip8->memory[chip8->pc])<<8)||(chip8->memory[(chip8->pc)+1]);
+    chip8->pc+=2;
+
+    switch(instruction){
+        case()
+    }
+
+
+}*/
 
 
 //main function
