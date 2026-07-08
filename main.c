@@ -152,16 +152,99 @@ void handle_event(Chip8* chip8, SDL_Event* event){
 
 }
 
-/*void emulate_cycle(Chip8* chip8){
-    uint16_t instruction= ((chip8->memory[chip8->pc])<<8)||(chip8->memory[(chip8->pc)+1]);
-    chip8->pc+=2;
+void emulate_cycle(Chip8* chip8){
 
-    switch(instruction){
-        case()
+
+    uint8_t first=(chip8->memory[chip8->pc])>>4;
+    uint8_t second=(chip8->memory[chip8->pc]&15;
+    uint8_t third=(chip8->memory[(chip8->pc)+1])>>4;
+    uint8_t fourth=(chip8->memory[(chip8->pc)+1])&15;
+    (chip8->pc)+=2;
+
+
+
+
+    switch(first){
+        case(0x0):
+            if(third==0xE && fourth==0){
+                //00E0 clear screen
+                memset((chip8->display), 0, sizeof(chip8->display));
+            }
+            else if(third==0xE && fourth==0xE){
+                //00EE return from a subroutine
+                chip8->pc=stack[sp--];
+            }
+            break;
+
+        case(0x1):/*1nnn jump to location nnn*/ (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
+        case(0x2):/*2nnn CALL addr nnn*/chip8->stack[++(chip8->sp)]=chip8->pc; (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
+        case(0x3):/*3xkk*/(chip8->pc)+=((chip8->reg[second])==(third<<4)|fourth)?2:0; break;
+        case(0x4):/*4xkk*/(chip8->pc)+=((chip8->reg[second])!=(third<<4)|fourth)?2:0; break;
+        case(0x5):/*5xy0*/(chip8->pc)+=((chip8->reg[second])==(chip8->reg[third]))?2:0; break;
+        case(0x6):/*6xkk*/(chip8->reg[second])=(third<<4)|fourth; break;
+        case(0x7):/*7xkk*/(chip8->reg[second])+=(third<<4)|fourth; break;
+        case(0x8):
+            switch(fourth){
+                case(0x1):/*8xy1: Vx=Vx|Vy*/(chip8->reg[second])|= (chip8->reg[third]); break;
+                case(0x2):/*8xy2: Vx=Vx&Vy*/(chip8->reg[second])&= (chip8->reg[third]); break;
+                case(0x3):/*8xy3: Vx=Vx&Vy*/(chip8->reg[second])^= (chip8->reg[third]); break;
+                case(0x4):
+                    /*8xy4: Vx=Vx+Vy, VF=carry*/
+                    uint16_t sum=(chip8->reg[second])+(chip8->reg[third]);
+                    chip8->reg[second]=sum&0xFF;//sum
+                    chip8->reg[0xF]=(sum>>8)&0xFF/;//carry
+                    break;
+                case(0x5):
+                    /*8xy5 - SUB Vx, Vy*/
+                    uint16_t sum=1+(chip8->reg[second])+(chip8->reg[third])^(0xFF);
+                    chip8->reg[second]=sum&0xFF;//difference
+                    chip8->reg[0xF]=(sum>>8)&0xFF/;//not borrow(if 1 means vx is the actual value if 0 means 2s complement of vx is the value)
+                    break;
+                case(0x6):
+                    /*Shift Vx 1 bit right, store LSB in VF*/
+                    chip8->reg[0xF]=(chip8->reg[second])%2==0?0:1;
+                    (chip8->reg[second])>>=1;
+                    break;
+                case(0x7):
+                    /*8xy7 Vx = Vy - Vx*/
+                    uint16_t sum=1+(chip8->reg[third])+(chip8->reg[second])^(0xFF);
+                    chip8->reg[second]=sum&0xFF;//difference
+                    chip8->reg[0xF]=(sum>>8)&0xFF/;//not borrow(if 1 means vx is the actual value if 0 means 2s complement of vx is the value)
+                    break;
+                case(0xE):
+                    /*Shift Vx 1 bit left, store MSB in VF*/
+                    chip8->reg[0xF]=(chip8->reg[second])<32768?0:1;
+                    (chip8->reg[second])<<=1;
+                    break;
+
+            }
+            break;
+        case(0x9):/*9xy0 Skip next instruction if Vx != Vy.*/(chip8->pc)+=((chip8->reg[second])!=(chip8->reg[third]))?2:0; break;
+        case(0xA):/*Annn set I(index) to nnn*/(chip8->index)=(second<<8)|(third<<4)|(fourth); break;
+        case(0xB):/*Bnnn Jump to location nnn + V0.*/ (chip8->pc)=((second<<8)|(third<<4)|(fourth))+chip8->reg[0];  break;
+        case(0xC):
+            /*Cxkk Set Vx = random byte AND kk*/
+            srand(time(NULL));
+            uint8_t random_byte = rand()%256;
+            (chip8->reg[second])&=random_byte;
+            break;
+
+        case(0xD):
+        case(0xE):
+            if(third==0x9){(chip8->pc)+=((chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
+            else if(third==0xA){(chip8->pc)+=((chip8->keypad[chip8->reg[second]])==0?2:0;}
+            break;
+        case(0xF):
+            uint8_t last=third<<4|fourth;
+            switch(last){
+                case(0x07):/*Set Vx = delay timer value.*/chip8->reg[second]=chip8->dtimer; break;
+                case(0x0A):
+            }
+            break;
     }
 
 
-}*/
+}
 
 
 //main function
