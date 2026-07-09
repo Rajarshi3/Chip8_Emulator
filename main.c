@@ -15,6 +15,8 @@ typedef struct{
 
 //the chip8 structure
 typedef struct{
+    bool block; //stopping flag for Fx0A instruction
+    uint8_t bindex;//index of register that will take input
     uint8_t memory[4096]; //4KB memory=4096 x 1Byte=4096 x 8bits
     uint8_t reg[16]; //16 x 8bit registers
     uint16_t index; //16 bit index register to store memory addresses
@@ -23,7 +25,7 @@ typedef struct{
     uint16_t stack[16]; //stack memory(an array of 16 16bit values used to store return adresses when calling subroutines)
     uint8_t dtimer; //8bit delay timer register
     uint8_t stimer; //8bit sound timer register
-    uint32_t display[64*32]; //storing the state of the default 64x32 display
+    uint32_t display[64*32]; //storing the state of the default 64x32 display using 32 bits for SDL compatibility
     uint8_t keypad[16]; //storing the state of keypad
 } Chip8;
 
@@ -107,7 +109,7 @@ void run(Chip8* chip8){
 
 //keyboard/input handling function
 void handle_event(Chip8* chip8, SDL_Event* event){
-
+    if(!(event->type==SDL_KEYUP || event->type==SDL_KEYDOWN)){return;}
     /*
     SDL_Event is a enum that has a member called type
     if(event->type==SDL_KEYDOWN) it means a keyboard key has been pressed.
@@ -127,25 +129,25 @@ void handle_event(Chip8* chip8, SDL_Event* event){
     A0BF zxcv
     */
     switch(event->key.keysym.sym){
-        case(SDLK_1): chip8->keypad[0]=key_state; break;
-        case(SDLK_2): chip8->keypad[1]=key_state; break;
-        case(SDLK_3): chip8->keypad[2]=key_state; break;
-        case(SDLK_4): chip8->keypad[3]=key_state; break;
+        case(SDLK_1): chip8->keypad[0]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=0;chip8->block=false;} break;
+        case(SDLK_2): chip8->keypad[1]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=1;chip8->block=false;} break;
+        case(SDLK_3): chip8->keypad[2]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=2;chip8->block=false;} break;
+        case(SDLK_4): chip8->keypad[3]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=3;chip8->block=false;} break;
 
-        case(SDLK_q): chip8->keypad[4]=key_state; break;
-        case(SDLK_w): chip8->keypad[5]=key_state; break;
-        case(SDLK_e): chip8->keypad[6]=key_state; break;
-        case(SDLK_r): chip8->keypad[7]=key_state; break;
+        case(SDLK_q): chip8->keypad[4]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=4;chip8->block=false;} break;
+        case(SDLK_w): chip8->keypad[5]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=5;chip8->block=false;} break;
+        case(SDLK_e): chip8->keypad[6]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=6;chip8->block=false;} break;
+        case(SDLK_r): chip8->keypad[7]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=7;chip8->block=false;} break;
 
-        case(SDLK_a): chip8->keypad[8]=key_state; break;
-        case(SDLK_s): chip8->keypad[9]=key_state; break;
-        case(SDLK_d): chip8->keypad[10]=key_state; break;
-        case(SDLK_f): chip8->keypad[11]=key_state; break;
+        case(SDLK_a): chip8->keypad[8]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=8;chip8->block=false;} break;
+        case(SDLK_s): chip8->keypad[9]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=9;chip8->block=false;} break;
+        case(SDLK_d): chip8->keypad[10]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=10;chip8->block=false;} break;
+        case(SDLK_f): chip8->keypad[11]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=11;chip8->block=false;} break;
 
-        case(SDLK_z): chip8->keypad[12]=key_state; break;
-        case(SDLK_x): chip8->keypad[13]=key_state; break;
-        case(SDLK_c): chip8->keypad[14]=key_state; break;
-        case(SDLK_v): chip8->keypad[15]=key_state; break;
+        case(SDLK_z): chip8->keypad[12]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=12;chip8->block=false;} break;
+        case(SDLK_x): chip8->keypad[13]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=13;chip8->block=false;} break;
+        case(SDLK_c): chip8->keypad[14]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=14;chip8->block=false;} break;
+        case(SDLK_v): chip8->keypad[15]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[bindex]=15;chip8->block=false;} break;
 
 
     }
@@ -154,6 +156,7 @@ void handle_event(Chip8* chip8, SDL_Event* event){
 
 void emulate_cycle(Chip8* chip8){
 
+    if(chip8->block==true){return;}//block execution
 
     uint8_t first=(chip8->memory[chip8->pc])>>4;
     uint8_t second=(chip8->memory[chip8->pc]&15;
@@ -229,7 +232,7 @@ void emulate_cycle(Chip8* chip8){
             (chip8->reg[second])&=random_byte;
             break;
 
-        case(0xD):
+        case(0xD):/*Draw opcode*/
         case(0xE):
             if(third==0x9){(chip8->pc)+=((chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
             else if(third==0xA){(chip8->pc)+=((chip8->keypad[chip8->reg[second]])==0?2:0;}
@@ -238,9 +241,33 @@ void emulate_cycle(Chip8* chip8){
             uint8_t last=third<<4|fourth;
             switch(last){
                 case(0x07):/*Set Vx = delay timer value.*/chip8->reg[second]=chip8->dtimer; break;
-                case(0x0A):
+                case(0x0A):/*Fx0A Wait for key press, store key value in Vx.*/chip8->block=true; chip8->bindex=second; break;
+                case(0x15):/*Set delay timer = Vx*/chip8->dtimer=chip8->reg[second];break;
+                case(0x18):/*Set sound timer = Vx.*/chip8->stimer=chip8->reg[second];break;
+                case(0x1E):/*Fx1E Set I = I + Vx.*/ chip8->index+=chip8->reg[second];break;
+                case(0x29):/*Set I = location of sprite for digit Vx.*/break;
+                case(0x33):
+                    /*Store BCD Vx in memloc I, I+1, and I+2*/
+                    uint8_t a=chip8->reg[second];
+                    chip8->memory[chip8->index]=a/100;
+                    chip8->memory[chip8->(index+1)]=(a/10)-(10*(a/100));
+                    chip8->memory[chip8->(index+2)]=a-(10*(a/10));
+                    break;
+                case(0x55):
+                    /*Store registers V0 through Vx in memory starting at location I*/
+                    for(uint8_t i=0;i<0xFF;i++){
+                        chip8->memory[chip8->(index+i)]=chip8->reg[i];
+                    }
+                    break;
+                case(0x65):
+                    /*Read registers V0 through Vx from memory starting at location I.*/
+                    for(uint8_t i=0;i<0xFF;i++){
+                        chip8->reg[i]=chip8->memory[chip8->(index+i)];
+                    }
+                    break;
+
             }
-            break;
+
     }
 
 
