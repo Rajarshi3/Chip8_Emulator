@@ -256,10 +256,17 @@ void emulate_cycle(Chip8* chip8){
             break;
 
         case(0xD):/*Draw opcode: DXYN*/
-            uint8_t x=(chip8->reg[second])%64;
-            uint8_t y=(chip8->reg[third])%32;
+            //basic idea is in original chip8 it was 1 bit per pixel now it is 1 byte so go figure
+            uint8_t start_x=(chip8->reg[second])%64;
+            uint8_t start_y=(chip8->reg[third])%32;
             for(int i=0;i<fourth;i++){
-
+                for(int j=0;j<8;j++){
+                    uint8_t currentx=(start_x+j)%64;
+                    uint8_t currenty=(start_y+i)%32;
+                    uint32_t wrindex=64*(currenty)+currentx;
+                    uint32_t towrite=((chip8->memory[(chip8->index)+i])>>j)&1;
+                    chip8->reg[0xF]=((chip8->display[wrindex])&towrite)==1?0:1;//collision
+                }
             }
         case(0xE):
             if(third==0x9){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
