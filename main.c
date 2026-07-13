@@ -99,7 +99,7 @@ void cleanup(Game* game, int exit_status){
 
 }
 //main loop for detecting inputs and running the emulator
-void run(Chip8* chip8){
+void run(Chip8* chip8, Game* game){
     bool quit=false;
     SDL_Event event;
     while(!quit){
@@ -108,12 +108,13 @@ void run(Chip8* chip8){
             handle_event(chip8, &event);
         }
 
+        //emulate cycle runs at about 600Hz
         for(int i=0;i<10*run_speed;i++){
             emulate_cycle(chip8);
         }
-
-        update_timer(chip8);
-        render_screen(chip8);
+        //timer runs ar 60Hz
+        update_timer(chip8,game);
+        render_screen(chip8, game);
 
         //so the main loop runs with a 16ms delay which means
         /*
@@ -177,6 +178,7 @@ void handle_event(Chip8* chip8, SDL_Event* event){
 
 }
 
+//function for fetch-decode-execute cycle of chip8 instructions
 void emulate_cycle(Chip8* chip8){
 
     if(chip8->block==true){return;}//block execution
@@ -259,14 +261,17 @@ void emulate_cycle(Chip8* chip8){
             //basic idea is in original chip8 it was 1 bit per pixel now it is 1 byte so go figure
             uint8_t start_x=(chip8->reg[second])%64;
             uint8_t start_y=(chip8->reg[third])%32;
+            bool collision=false;
             for(int i=0;i<fourth;i++){
                 for(int j=0;j<8;j++){
                     uint8_t currentx=(start_x+j)%64;
                     uint8_t currenty=(start_y+i)%32;
                     uint32_t wrindex=64*(currenty)+currentx;
                     uint32_t towrite=((chip8->memory[(chip8->index)+i])>>j)&1;
-                    chip8->reg[0xF]=((chip8->display[wrindex])&towrite)==1?0:1;//collision
+                    collision=((chip8->display[wrindex]==1)&&(towrite==1))?true:false;//collision
+                    chip8->display[wrindex]^=towrite;
                 }
+                chip8->reg[0xF]=(collision==true)?1:0;
             }
         case(0xE):
             if(third==0x9){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
@@ -308,6 +313,41 @@ void emulate_cycle(Chip8* chip8){
 
 }
 
+//function to render screen using SDL
+void render_screen(Chip8* chip8, Game* game){
+    if(SDL_UpdateTexture(game->texture, NULL, chip8->display, 64*sizeof(uint32_t))){
+        fprintf(stderr, "SDL_UpdateTexture() failed \n %s\n", SDL_GetError());
+    }
+    SDL_RenderClear(game->renderer);
+    if(SDL_RenderClear(game->renderer)){
+        fprintf(stderr, "SDL_RenderClear() failed \n %s\n", SDL_GetError());
+    }
+    if(SDL_RenderCopy(game->renderer, game->texture, NULL, NULL)){
+        fprintf(stderr, "SDL_RenderCopy() failed \n %s\n", SDL_GetError());
+    }
+    if(SDL_RenderPresent(game->renderer)){
+        fprintf(stderr, "SDL_RenderPresent() failed \n %s\n", SDL_GetError());
+    }
+}
+
+
+//will look at integrating with SDL to make audio work later
+void update_timer(Chip8* chip8, Game* game){
+chip8->dtimer-=(chip8->dtimer>0)?1:0;
+chip8->stimer-=(chip8->stimer>0)?1:0;
+}
+
+//function to copy fonts to:
+//1.copy fonts to memory of chip8
+//2.copy the ROM to the memory of chip8
+//3.set the sp and pc to appropriate values
+/*void processor_init(Chip8* chip8){
+    //copy fonts to chip8 memory
+    for(int i=0;i<80;i++){
+        chip8->memory[0x50+i]=hex_symbols[i];
+    }
+    //
+}*/
 
 //main function
 int main(int argc, char* argv[]){
