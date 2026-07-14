@@ -341,39 +341,86 @@ chip8->stimer-=(chip8->stimer>0)?1:0;
 //1.copy fonts to memory of chip8
 //2.copy the ROM to the memory of chip8
 //3.set the sp and pc to appropriate values
-void processor_init(Chip8* chip8, FILE* rom){
+int processor_init(Chip8* chip8, FILE* rom){
     //copy fonts to chip8 memory
     for(int i=0;i<80;i++){
         chip8->memory[0x50+i]=hex_symbols[i];
     }
     //copying the rom
+    //first moving to the end of the file
+    fseek(rom,0,SEEK_END);
+
+    //finding the size of the file using ftell
+    long int size_of_rom=ftell(rom);
+    if(size_of_rom<0){
+        printf("ftell() error finding the size of file\n");
+        fprintf(stderr, "ftell() error finding the size of file\n");
+        return 1;
+    }
+
+    //checking if sizeofrom exceeds the space available in chip8->memory[4096]
+    if(size_of_rom>4096-0x200){
+        printf("The ROM exceeds the available memory in chip8\n");
+        fprintf(stderr, "The ROM exceeds the available memory in chip8\n");
+        return 1;
+    }
+    //returning to the beginning of the file
+    rewind(rom);
+
+    //allocating memory for the buffer
+    uint8_t* temp=malloc(size_of_rom);
+    if(!temp){fprintf(stderr,"In processor_init allocating buffer memory failed\n"); return 1;}
+
+    //reading from file to buffer
+    int read_bytes=fread(temp,1, size_of_rom, rom);
+    if(read_bytes!=size_of_rom){fprintf(stderr,"In processor_init fread() failed\n"); free(temp); return 1;}
+
+    for(int i=0; i<size_of_rom;i++){
+        chip8->memory[0x200+i]=temp[i];
+    }
+    free(temp);
+
+    //initialising the pc and sp
+    chip8->pc=0x200;
+    chip8->sp=0;
+    return 0;
 
 }
 
 //main function
 int main(int argc, char* argv[]){
      FILE* rom;
-    if(argc<2){printf("program executed for less than expected arguments\n"); exit(1);}
+    if(argc<2){
+            printf("program executed for less than expected arguments\n");
+            fprintf(stderr,"program executed for less than expected arguments\n"); exit(1);
+        }
     else if(argc==2){
-
         if((rom=fopen(argv[1], "rb"))==NULL){
             printf("Cannot open file\n");
+            fprintf(stderr,"Cannot open file\n");
             exit(1);
         }
     }
     else{
         printf("Too many arguments\n"); exit(1);
+        fprintf(stderr,"Too many arguments\n");
     }
 
     Game game={0};
     if(init(&game)){
         printf("init didnt work\n");
+        fprintf(stderr,"init didnt work\n");
         cleanup(&game, EXIT_FAILURE);
         exit(1);
     }
 
     Chip8* chip8={0};
-    processor_init(chip8,rom);
+    if(processor_init(&chip8,rom)){
+        printf("processor_init failed\n");
+        fprintf(stderr,"processor_init failed\n");
+        cleanup(&game, EXIT_FAILURE);
+        exit(1);
+    };
 
     exit(0);
 }
