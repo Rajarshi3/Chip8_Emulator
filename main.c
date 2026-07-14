@@ -341,26 +341,39 @@ chip8->stimer-=(chip8->stimer>0)?1:0;
 //1.copy fonts to memory of chip8
 //2.copy the ROM to the memory of chip8
 //3.set the sp and pc to appropriate values
-/*void processor_init(Chip8* chip8){
+void processor_init(Chip8* chip8, FILE* rom){
     //copy fonts to chip8 memory
     for(int i=0;i<80;i++){
         chip8->memory[0x50+i]=hex_symbols[i];
     }
-    //
-}*/
+    //copying the rom
+
+}
 
 //main function
 int main(int argc, char* argv[]){
+     FILE* rom;
+    if(argc<2){printf("program executed for less than expected arguments\n"); exit(1);}
+    else if(argc==2){
+
+        if((rom=fopen(argv[1], "rb"))==NULL){
+            printf("Cannot open file\n");
+            exit(1);
+        }
+    }
+    else{
+        printf("Too many arguments\n"); exit(1);
+    }
+
     Game game={0};
     if(init(&game)){
         printf("init didnt work\n");
         cleanup(&game, EXIT_FAILURE);
         exit(1);
     }
-    SDL_RenderClear(game.renderer);
-    SDL_RenderPresent(game.renderer);
-    SDL_Delay(2000);
-    printf("Went well\n");
-    cleanup(&game, EXIT_SUCCESS);
+
+    Chip8* chip8={0};
+    processor_init(chip8,rom);
+
     exit(0);
 }
