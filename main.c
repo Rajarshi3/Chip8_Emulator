@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <SDL.h>
+#include <string.h>
+#include <time.h>
 
 #define WINDOW_TITLE "Chip8 Emulator"
 #define scale 10
@@ -98,38 +101,6 @@ void cleanup(Game* game, int exit_status){
     exit(exit_status);
 
 }
-//main loop for detecting inputs and running the emulator
-void run(Chip8* chip8, Game* game){
-    bool quit=false;
-    SDL_Event event;
-    while(!quit){
-        while(SDL_PollEvent(&event)){
-            if(event.type==SDL_QUIT){quit=true;}
-            handle_event(chip8, &event);
-        }
-
-        //emulate cycle runs at about 600Hz
-        for(int i=0;i<10*run_speed;i++){
-            emulate_cycle(chip8);
-        }
-        //timer runs ar 60Hz
-        update_timer(chip8,game);
-        render_screen(chip8, game);
-
-        //so the main loop runs with a 16ms delay which means
-        /*
-        Here is what the timeline of one loop iteration looks like:
-        T = 0.0ms: The loop starts. SDL_PollEvent checks your keyboard.
-        T = 0.1ms: The CPU executes 10 instructions and updates the screen array.
-        T = 0.2ms: SDL renders the pixels to the window.
-        T = 0.2ms to 16.2ms: SDL_Delay(16) puts your program completely to sleep. It does nothing.
-        T = 16.2ms: The loop restarts, and SDL_PollEvent checks your keyboard again.
-        */
-
-        SDL_Delay(16);
-    }
-
-}
 
 //keyboard/input handling function
 void handle_event(Chip8* chip8, SDL_Event* event){
@@ -200,48 +171,50 @@ void emulate_cycle(Chip8* chip8){
             }
             else if(third==0xE && fourth==0xE){
                 //00EE return from a subroutine
-                chip8->pc=stack[(chip8->sp)--];
+                chip8->pc=chip8->stack[(chip8->sp)--];
             }
             break;
 
         case(0x1):/*1nnn jump to location nnn*/ (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
         case(0x2):/*2nnn CALL addr nnn*/chip8->stack[++(chip8->sp)]=chip8->pc; (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
-        case(0x3):/*3xkk*/(chip8->pc)+=((chip8->reg[second])==(third<<4)|fourth)?2:0; break;
-        case(0x4):/*4xkk*/(chip8->pc)+=((chip8->reg[second])!=(third<<4)|fourth)?2:0; break;
+        case(0x3):/*3xkk*/(chip8->pc)+=((chip8->reg[second])==((third<<4)|fourth))?2:0; break;
+        case(0x4):/*4xkk*/(chip8->pc)+=((chip8->reg[second])!=((third<<4)|fourth))?2:0; break;
         case(0x5):/*5xy0*/(chip8->pc)+=((chip8->reg[second])==(chip8->reg[third]))?2:0; break;
         case(0x6):/*6xkk*/(chip8->reg[second])=(third<<4)|fourth; break;
         case(0x7):/*7xkk*/(chip8->reg[second])+=(third<<4)|fourth; break;
         case(0x8):
             switch(fourth){
+                case(0x1):/*8xy0: Set Vx = Vy*/(chip8->reg[second])=(chip8->reg[third]);break;
                 case(0x1):/*8xy1: Vx=Vx|Vy*/(chip8->reg[second])|= (chip8->reg[third]); break;
                 case(0x2):/*8xy2: Vx=Vx&Vy*/(chip8->reg[second])&= (chip8->reg[third]); break;
                 case(0x3):/*8xy3: Vx=Vx&Vy*/(chip8->reg[second])^= (chip8->reg[third]); break;
-                case(0x4):
+                case(0x4):{
                     /*8xy4: Vx=Vx+Vy, VF=carry*/
                     uint16_t sum=(chip8->reg[second])+(chip8->reg[third]);
                     chip8->reg[second]=sum&0xFF;//sum
-                    chip8->reg[0xF]=(sum>>8)&0xFF/;//carry
-                    break;
-                case(0x5):
+                    chip8->reg[0xF]=(sum>>8)&0xFF;//carry
+                    break;}
+
+                case(0x5):{
                     /*8xy5 - SUB Vx, Vy*/
                     uint16_t sum=1+(chip8->reg[second])+((chip8->reg[third])^(0xFF));
                     chip8->reg[second]=sum&0xFF;//difference
-                    chip8->reg[0xF]=(sum>>8)&0xFF/;//not borrow(if 1 means vx is the actual value if 0 means 2s complement of vx is the value)
-                    break;
+                    chip8->reg[0xF]=(sum>>8)&0xFF;//not borrow(if 1 means vx is the actual value if 0 means 2s complement of vx is the value)
+                    break;}
                 case(0x6):
                     /*Shift Vx 1 bit right, store LSB in VF*/
                     chip8->reg[0xF]=(chip8->reg[second])%2==0?0:1;
                     (chip8->reg[second])>>=1;
                     break;
-                case(0x7):
+                case(0x7):{
                     /*8xy7 Vx = Vy - Vx*/
                     uint16_t sum=1+(chip8->reg[third])+((chip8->reg[second])^(0xFF));
                     chip8->reg[second]=sum&0xFF;//difference
                     chip8->reg[0xF]=(sum>>8)&0xFF;//not borrow(if 1 means vx is the actual value if 0 means 2s complement of vx is the value)
-                    break;
+                    break;}
                 case(0xE):
-                    /*Shift Vx 1 bit left, store MSB in VF*/
-                    chip8->reg[0xF]=(chip8->reg[second])<32768?0:1;
+                    /*8xyE Shift Vx 1 bit left, store MSB in VF*/
+                    chip8->reg[0xF]=(chip8->reg[second])<0x80?0:1;
                     (chip8->reg[second])<<=1;
                     break;
 
@@ -254,7 +227,7 @@ void emulate_cycle(Chip8* chip8){
             /*Cxkk Set Vx = random byte AND kk*/
             srand(time(NULL));
             uint8_t random_byte = rand()%256;
-            (chip8->reg[second])&=random_byte;
+            (chip8->reg[second])=random_byte&((third<<4)|fourth));
             break;
 
         case(0xD):/*Draw opcode: DXYN*/
@@ -273,6 +246,7 @@ void emulate_cycle(Chip8* chip8){
                 }
                 chip8->reg[0xF]=(collision==true)?1:0;
             }
+            break;
         case(0xE):
             if(third==0x9){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
             else if(third==0xA){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==0?2:0;}
@@ -294,14 +268,14 @@ void emulate_cycle(Chip8* chip8){
                     chip8->memory[(chip8->index)+2]=a-(10*(a/10));
                     break;
                 case(0x55):
-                    /*Store registers V0 through Vx in memory starting at location I*/
-                    for(uint8_t i=0;i<=0xFF;i++){
+                    /*Fx55 Store registers V0 through Vx in memory starting at location I*/
+                    for(uint8_t i=0;i<=second;i++){
                         chip8->memory[(chip8->index)+i]=chip8->reg[i];
                     }
                     break;
                 case(0x65):
-                    /*Read registers V0 through Vx from memory starting at location I.*/
-                    for(uint8_t i=0;i<=0xFF;i++){
+                    /*Fx65 Read registers V0 through Vx from memory starting at location I.*/
+                    for(uint8_t i=0;i<=second;i++){
                         chip8->reg[i]=chip8->memory[(chip8->index)+i];
                     }
                     break;
@@ -337,31 +311,77 @@ chip8->dtimer-=(chip8->dtimer>0)?1:0;
 chip8->stimer-=(chip8->stimer>0)?1:0;
 }
 
+//main loop for detecting inputs and running the emulator
+void run(Chip8* chip8, Game* game){
+    bool quit=false;
+    SDL_Event event;
+    while(!quit){
+        while(SDL_PollEvent(&event)){
+            if(event.type==SDL_QUIT){quit=true;}
+            handle_event(chip8, &event);
+        }
+
+        //emulate cycle runs at about 600Hz
+        for(int i=0;i<10*run_speed;i++){
+            emulate_cycle(chip8);
+        }
+        //timer runs ar 60Hz
+        update_timer(chip8,game);
+        render_screen(chip8, game);
+
+        //so the main loop runs with a 16ms delay which means
+        /*
+        Here is what the timeline of one loop iteration looks like:
+        T = 0.0ms: The loop starts. SDL_PollEvent checks your keyboard.
+        T = 0.1ms: The CPU executes 10 instructions and updates the screen array.
+        T = 0.2ms: SDL renders the pixels to the window.
+        T = 0.2ms to 16.2ms: SDL_Delay(16) puts your program completely to sleep. It does nothing.
+        T = 16.2ms: The loop restarts, and SDL_PollEvent checks your keyboard again.
+        */
+
+        SDL_Delay(16);
+    }
+
+}
+
+
 //function to copy fonts to:
 //1.copy fonts to memory of chip8
 //2.copy the ROM to the memory of chip8
 //3.set the sp and pc to appropriate values
-int processor_init(Chip8* chip8, FILE* rom){
+
+int processor_init(Chip8* chip8, char* rom_address){
+
     //copy fonts to chip8 memory
     for(int i=0;i<80;i++){
-        chip8->memory[0x50+i]=hex_symbols[i];
-    }
+        chip8->memory[0x50+i]=hex_symbols[i];    }
+
+
     //copying the rom
-    //first moving to the end of the file
+    //opening the file
+    FILE* rom;
+    if((rom=fopen(rom_address, "rb"))==NULL){
+        //printf("Cannot open file\n");
+        fprintf(stderr,"Cannot open file\n");
+        exit(1);
+    }
+    //moving to the end of the file
     fseek(rom,0,SEEK_END);
 
     //finding the size of the file using ftell
     long int size_of_rom=ftell(rom);
     if(size_of_rom<0){
-        printf("ftell() error finding the size of file\n");
+        //printf("ftell() error finding the size of file\n");
         fprintf(stderr, "ftell() error finding the size of file\n");
+        fclose(rom);
         return 1;
     }
 
     //checking if sizeofrom exceeds the space available in chip8->memory[4096]
     if(size_of_rom>4096-0x200){
-        printf("The ROM exceeds the available memory in chip8\n");
+        //printf("The ROM exceeds the available memory in chip8\n");
         fprintf(stderr, "The ROM exceeds the available memory in chip8\n");
+        fclose(rom);
         return 1;
     }
     //returning to the beginning of the file
@@ -369,16 +389,17 @@ int processor_init(Chip8* chip8, FILE* rom){
 
     //allocating memory for the buffer
     uint8_t* temp=malloc(size_of_rom);
-    if(!temp){fprintf(stderr,"In processor_init allocating buffer memory failed\n"); return 1;}
+    if(!temp){fprintf(stderr,"In processor_init allocating buffer memory failed\n");fclose(rom); return 1;}
 
     //reading from file to buffer
     int read_bytes=fread(temp,1, size_of_rom, rom);
-    if(read_bytes!=size_of_rom){fprintf(stderr,"In processor_init fread() failed\n"); free(temp); return 1;}
+    if(read_bytes!=size_of_rom){fprintf(stderr,"In processor_init fread() failed\n");fclose(rom); free(temp); return 1;}
 
     for(int i=0; i<size_of_rom;i++){
         chip8->memory[0x200+i]=temp[i];
     }
     free(temp);
+    fclose(rom);
 
     //initialising the pc and sp
     chip8->pc=0x200;
@@ -389,38 +410,46 @@ int processor_init(Chip8* chip8, FILE* rom){
 
 //main function
 int main(int argc, char* argv[]){
-     FILE* rom;
+     //FILE* rom;
+     char* rom_address;
     if(argc<2){
-            printf("program executed for less than expected arguments\n");
-            fprintf(stderr,"program executed for less than expected arguments\n"); exit(1);
-        }
-    else if(argc==2){
-        if((rom=fopen(argv[1], "rb"))==NULL){
-            printf("Cannot open file\n");
-            fprintf(stderr,"Cannot open file\n");
+            //printf("program executed for less than expected arguments\n");
+            fprintf(stderr,"program executed for less than expected arguments\n");
             exit(1);
         }
+    else if(argc==2){
+        /*if((rom=fopen(argv[1], "rb"))==NULL){
+            //printf("Cannot open file\n");
+            fprintf(stderr,"Cannot open file\n");
+            exit(1);
+        }*/
+        if(argv[1]==NULL){fprintf(stderr,"File does not exist\n");exit(1);}
+        rom_address=argv[1];
     }
     else{
-        printf("Too many arguments\n"); exit(1);
+        //printf("Too many arguments\n");
         fprintf(stderr,"Too many arguments\n");
+        exit(1);
     }
 
     Game game={0};
     if(init(&game)){
-        printf("init didnt work\n");
+        //printf("init didnt work\n");
         fprintf(stderr,"init didnt work\n");
         cleanup(&game, EXIT_FAILURE);
         exit(1);
     }
 
-    Chip8* chip8={0};
-    if(processor_init(&chip8,rom)){
-        printf("processor_init failed\n");
+    Chip8 chip8={0};
+    if(processor_init(&chip8,rom_address)){
+        //printf("processor_init failed\n");
         fprintf(stderr,"processor_init failed\n");
         cleanup(&game, EXIT_FAILURE);
         exit(1);
     };
+
+    run(&chip8, &game);
+    cleanup(&game, EXIT_SUCCESS);
 
     exit(0);
 }
