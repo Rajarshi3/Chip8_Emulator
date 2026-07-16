@@ -187,7 +187,7 @@ void emulate_cycle(Chip8* chip8){
                 case(0x1):/*8xy0: Set Vx = Vy*/(chip8->reg[second])=(chip8->reg[third]);break;
                 case(0x1):/*8xy1: Vx=Vx|Vy*/(chip8->reg[second])|= (chip8->reg[third]); break;
                 case(0x2):/*8xy2: Vx=Vx&Vy*/(chip8->reg[second])&= (chip8->reg[third]); break;
-                case(0x3):/*8xy3: Vx=Vx&Vy*/(chip8->reg[second])^= (chip8->reg[third]); break;
+                case(0x3):/*8xy3: Vx=Vx^Vy*/(chip8->reg[second])^= (chip8->reg[third]); break;
                 case(0x4):{
                     /*8xy4: Vx=Vx+Vy, VF=carry*/
                     uint16_t sum=(chip8->reg[second])+(chip8->reg[third]);
@@ -241,7 +241,7 @@ void emulate_cycle(Chip8* chip8){
                     uint8_t currenty=(start_y+i)%32;
                     uint32_t wrindex=64*(currenty)+currentx;
                     uint32_t towrite=((chip8->memory[(chip8->index)+i])>>j)&1;
-                    collision=((chip8->display[wrindex]==1)&&(towrite==1))?true:false;//collision
+                   if((chip8->display[wrindex]==1)&&(towrite==1)){collision=true;};//collision
                     chip8->display[wrindex]^=towrite;
                 }
                 chip8->reg[0xF]=(collision==true)?1:0;
@@ -292,7 +292,6 @@ void render_screen(Chip8* chip8, Game* game){
     if(SDL_UpdateTexture(game->texture, NULL, chip8->display, 64*sizeof(uint32_t))){
         fprintf(stderr, "SDL_UpdateTexture() failed \n %s\n", SDL_GetError());
     }
-    SDL_RenderClear(game->renderer);
     if(SDL_RenderClear(game->renderer)){
         fprintf(stderr, "SDL_RenderClear() failed \n %s\n", SDL_GetError());
     }
