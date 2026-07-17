@@ -41,6 +41,7 @@ const uint8_t hex_symbols[80]={
 
 //the chip8 structure
 typedef struct{
+    bool commonROM;//for cowgod chip8 it will be false for normal chip8 it will be true
     bool block; //stopping flag for Fx0A instruction
     uint8_t bindex;//index of register that will take input
     uint8_t memory[4096]; //4KB memory=4096 x 1Byte=4096 x 8bits
@@ -51,7 +52,8 @@ typedef struct{
     uint16_t stack[16]; //stack memory(an array of 16 16bit values used to store return adresses when calling subroutines)
     uint8_t dtimer; //8bit delay timer register
     uint8_t stimer; //8bit sound timer register
-    uint32_t display[64*32]; //storing the state of the default 64x32 display using 32 bits for SDL compatibility
+    uint8_t display[64*32]; //storing the state of the default 64x32 display using 32 bits for SDL compatibility
+    //will check in future if I can reduce the display to 8x32
     uint8_t keypad[16]; //storing the state of keypad
 } Chip8;
 
@@ -86,14 +88,7 @@ bool init(Game* game){
 
 //final cleanup function
 void cleanup(Game* game, int exit_status){
-    /*if(game->renderer){
-        SDL_DestroyRenderer(game->renderer);
-    }
-    if(game->window){
-        SDL_DestroyWindow(game->window);
-    }
-    SDL_Quit();
-    exit(exit_status);*/
+
     SDL_DestroyTexture(game->texture);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
@@ -124,25 +119,25 @@ void handle_event(Chip8* chip8, SDL_Event* event){
     A0BF zxcv
     */
     switch(event->key.keysym.sym){
-        case(SDLK_1): chip8->keypad[0]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0;chip8->block=false;} break;
-        case(SDLK_2): chip8->keypad[1]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=1;chip8->block=false;} break;
-        case(SDLK_3): chip8->keypad[2]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=2;chip8->block=false;} break;
-        case(SDLK_4): chip8->keypad[3]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=3;chip8->block=false;} break;
+        case(SDLK_1): chip8->keypad[1]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=1;chip8->block=false;} break;
+        case(SDLK_2): chip8->keypad[2]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=2;chip8->block=false;} break;
+        case(SDLK_3): chip8->keypad[3]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=3;chip8->block=false;} break;
+        case(SDLK_4): chip8->keypad[0xC]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xC;chip8->block=false;} break;
 
         case(SDLK_q): chip8->keypad[4]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=4;chip8->block=false;} break;
         case(SDLK_w): chip8->keypad[5]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=5;chip8->block=false;} break;
         case(SDLK_e): chip8->keypad[6]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=6;chip8->block=false;} break;
-        case(SDLK_r): chip8->keypad[7]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=7;chip8->block=false;} break;
+        case(SDLK_r): chip8->keypad[0xD]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xD;chip8->block=false;} break;
 
-        case(SDLK_a): chip8->keypad[8]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=8;chip8->block=false;} break;
-        case(SDLK_s): chip8->keypad[9]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=9;chip8->block=false;} break;
-        case(SDLK_d): chip8->keypad[10]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=10;chip8->block=false;} break;
-        case(SDLK_f): chip8->keypad[11]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=11;chip8->block=false;} break;
+        case(SDLK_a): chip8->keypad[7]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=7;chip8->block=false;} break;
+        case(SDLK_s): chip8->keypad[8]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=8;chip8->block=false;} break;
+        case(SDLK_d): chip8->keypad[9]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=9;chip8->block=false;} break;
+        case(SDLK_f): chip8->keypad[0xE]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xE;chip8->block=false;} break;
 
-        case(SDLK_z): chip8->keypad[12]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=12;chip8->block=false;} break;
-        case(SDLK_x): chip8->keypad[13]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=13;chip8->block=false;} break;
-        case(SDLK_c): chip8->keypad[14]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=14;chip8->block=false;} break;
-        case(SDLK_v): chip8->keypad[15]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=15;chip8->block=false;} break;
+        case(SDLK_z): chip8->keypad[0xA]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xA;chip8->block=false;} break;
+        case(SDLK_x): chip8->keypad[0]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0;chip8->block=false;} break;
+        case(SDLK_c): chip8->keypad[0xB]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xB;chip8->block=false;} break;
+        case(SDLK_v): chip8->keypad[0xF]=key_state; if(chip8->block && event->type==SDL_KEYDOWN){chip8->reg[chip8->bindex]=0xF;chip8->block=false;} break;
 
 
     }
@@ -171,12 +166,12 @@ void emulate_cycle(Chip8* chip8){
             }
             else if(third==0xE && fourth==0xE){
                 //00EE return from a subroutine
-                chip8->pc=chip8->stack[(chip8->sp)--];
+                if(chip8->sp>0){chip8->pc=chip8->stack[(chip8->sp)--];}
             }
             break;
 
         case(0x1):/*1nnn jump to location nnn*/ (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
-        case(0x2):/*2nnn CALL addr nnn*/chip8->stack[++(chip8->sp)]=chip8->pc; (chip8->pc)=(second<<8)|(third<<4)|(fourth); break;
+        case(0x2):/*2nnn CALL addr nnn*/if(chip8->sp<15){chip8->stack[++(chip8->sp)]=chip8->pc; (chip8->pc)=(second<<8)|(third<<4)|(fourth);} break;
         case(0x3):/*3xkk*/(chip8->pc)+=((chip8->reg[second])==((third<<4)|fourth))?2:0; break;
         case(0x4):/*4xkk*/(chip8->pc)+=((chip8->reg[second])!=((third<<4)|fourth))?2:0; break;
         case(0x5):/*5xy0*/(chip8->pc)+=((chip8->reg[second])==(chip8->reg[third]))?2:0; break;
@@ -184,7 +179,7 @@ void emulate_cycle(Chip8* chip8){
         case(0x7):/*7xkk*/(chip8->reg[second])+=(third<<4)|fourth; break;
         case(0x8):
             switch(fourth){
-                case(0x1):/*8xy0: Set Vx = Vy*/(chip8->reg[second])=(chip8->reg[third]);break;
+                case(0x0):/*8xy0: Set Vx = Vy*/(chip8->reg[second])=(chip8->reg[third]);break;
                 case(0x1):/*8xy1: Vx=Vx|Vy*/(chip8->reg[second])|= (chip8->reg[third]); break;
                 case(0x2):/*8xy2: Vx=Vx&Vy*/(chip8->reg[second])&= (chip8->reg[third]); break;
                 case(0x3):/*8xy3: Vx=Vx^Vy*/(chip8->reg[second])^= (chip8->reg[third]); break;
@@ -225,28 +220,30 @@ void emulate_cycle(Chip8* chip8){
         case(0xB):/*Bnnn Jump to location nnn + V0.*/ (chip8->pc)=((second<<8)|(third<<4)|(fourth))+chip8->reg[0];  break;
         case(0xC):
             /*Cxkk Set Vx = random byte AND kk*/
-            srand(time(NULL));
             uint8_t random_byte = rand()%256;
-            (chip8->reg[second])=random_byte&((third<<4)|fourth));
+            (chip8->reg[second])=random_byte&((third<<4)|fourth);
             break;
 
-        case(0xD):/*Draw opcode: DXYN*/
+        case(0xD):{/*Draw opcode: DXYN*/
             //basic idea is in original chip8 it was 1 bit per pixel now it is 1 byte so go figure
             uint8_t start_x=(chip8->reg[second])%64;
             uint8_t start_y=(chip8->reg[third])%32;
             bool collision=false;
             for(int i=0;i<fourth;i++){
                 for(int j=0;j<8;j++){
-                    uint8_t currentx=(start_x+j)%64;
-                    uint8_t currenty=(start_y+i)%32;
-                    uint32_t wrindex=64*(currenty)+currentx;
-                    uint32_t towrite=((chip8->memory[(chip8->index)+i])>>j)&1;
+
+                    uint8_t currentx=(start_x+j);
+                    uint8_t currenty=(start_y+i);
+                    if(chip8->commonROM==true){if(currentx>=64 || currenty>=32){continue;}}
+                    else{currentx%=64;currenty%=32;}
+                    uint16_t wrindex=64*(currenty)+currentx;
+                    uint16_t towrite=((chip8->memory[(chip8->index)+i])>>(7-j))&1;
                    if((chip8->display[wrindex]==1)&&(towrite==1)){collision=true;};//collision
                     chip8->display[wrindex]^=towrite;
                 }
-                chip8->reg[0xF]=(collision==true)?1:0;
             }
-            break;
+            chip8->reg[0xF]=(collision==true)?1:0;
+            break;}
         case(0xE):
             if(third==0x9){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==1?2:0;}//Skip next instruction if key with the value of Vx is pressed
             else if(third==0xA){(chip8->pc)+=(chip8->keypad[chip8->reg[second]])==0?2:0;}
@@ -289,7 +286,11 @@ void emulate_cycle(Chip8* chip8){
 
 //function to render screen using SDL
 void render_screen(Chip8* chip8, Game* game){
-    if(SDL_UpdateTexture(game->texture, NULL, chip8->display, 64*sizeof(uint32_t))){
+    uint32_t pixels[64*32];
+    for(int i=0;i<64*32;i++){
+        pixels[i]=(chip8->display[i]==1)?0xFF00FF:0xFF;
+    }
+    if(SDL_UpdateTexture(game->texture, NULL, pixels, 64*sizeof(uint32_t))){
         fprintf(stderr, "SDL_UpdateTexture() failed \n %s\n", SDL_GetError());
     }
     if(SDL_RenderClear(game->renderer)){
@@ -298,9 +299,8 @@ void render_screen(Chip8* chip8, Game* game){
     if(SDL_RenderCopy(game->renderer, game->texture, NULL, NULL)){
         fprintf(stderr, "SDL_RenderCopy() failed \n %s\n", SDL_GetError());
     }
-    if(SDL_RenderPresent(game->renderer)){
-        fprintf(stderr, "SDL_RenderPresent() failed \n %s\n", SDL_GetError());
-    }
+    SDL_RenderPresent(game->renderer);
+
 }
 
 
@@ -410,7 +410,9 @@ int processor_init(Chip8* chip8, char* rom_address){
 //main function
 int main(int argc, char* argv[]){
      //FILE* rom;
+     srand(time(NULL));
      char* rom_address;
+     char* behaviour=NULL;
     if(argc<2){
             //printf("program executed for less than expected arguments\n");
             fprintf(stderr,"program executed for less than expected arguments\n");
@@ -422,8 +424,14 @@ int main(int argc, char* argv[]){
             fprintf(stderr,"Cannot open file\n");
             exit(1);
         }*/
-        if(argv[1]==NULL){fprintf(stderr,"File does not exist\n");exit(1);}
+        //if(argv[1]==NULL){fprintf(stderr,"File does not exist\n");exit(1);}
         rom_address=argv[1];
+    }
+    else if(argc==3){
+        //if(argv[1]==NULL){fprintf(stderr,"File does not exist\n");exit(1);}
+        rom_address=argv[1];
+        //if(argv[2]==NULL){fprintf(stderr,"Unknown argument\n");exit(1);}
+        behaviour=argv[2];
     }
     else{
         //printf("Too many arguments\n");
@@ -446,6 +454,9 @@ int main(int argc, char* argv[]){
         cleanup(&game, EXIT_FAILURE);
         exit(1);
     };
+    if(behaviour==NULL){chip8.commonROM=true;}
+    else if((!strcmp(behaviour,"cowgod")) || (!strcmp(behaviour,"1"))){chip8.commonROM=false;}
+    else if((!strcmp(behaviour,"normal"))|| (!strcmp(behaviour,"normal"))){chip8.commonROM=true;}
 
     run(&chip8, &game);
     cleanup(&game, EXIT_SUCCESS);
